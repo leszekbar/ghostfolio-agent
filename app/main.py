@@ -4,6 +4,8 @@ from fastapi import FastAPI
 
 from app.agent import run_agent
 from app.config import settings
+from app.data_sources import build_provider
+from app.data_sources.ghostfolio_api_provider import GhostfolioAPIDataProvider
 from app.ghostfolio_client import GhostfolioClient
 from app.schemas import ChatRequest, ChatResponse
 from app.tools import ToolContext
@@ -23,14 +25,16 @@ async def health() -> dict[str, str]:
 async def chat(request: ChatRequest) -> ChatResponse:
     session_history = SESSION_STORE[request.session_id]
     data_source = request.data_source or settings.default_data_source
-
-    tool_context = ToolContext(
-        data_source=data_source,
-        client=GhostfolioClient(
+    api_provider = GhostfolioAPIDataProvider(
+        GhostfolioClient(
             base_url=settings.ghostfolio_base_url,
             token=settings.ghostfolio_token,
             timeout_seconds=settings.request_timeout_seconds,
-        ),
+        )
+    )
+
+    tool_context = ToolContext(
+        provider=build_provider(data_source, api_provider),
     )
 
     result = await run_agent(

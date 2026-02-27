@@ -1,0 +1,12 @@
+from typing import Any, Protocol
+
+
+class PortfolioDataProvider(Protocol):
+    async def get_portfolio_summary(self, account_id: str | None = None) -> dict[str, Any]:
+        ...
+
+    async def get_performance(self, query_range: str) -> dict[str, Any]:
+        ...
+
+    async def get_transactions(self) -> list[dict[str, Any]]:
+        ...

@@ -27,5 +27,5 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-[tool.setuptools]
-packages = ["app"]
+[tool.setuptools.packages.find]
+include = ["app*"]

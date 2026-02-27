@@ -1,3 +1,6 @@
+from typing import Any
+
+
 MOCK_HOLDINGS = [
     {
         "symbol": "AAPL",
@@ -59,3 +62,22 @@ MOCK_TRANSACTIONS = [
         "currency": "USD",
     },
 ]
+
+
+class MockPortfolioDataProvider:
+    async def get_portfolio_summary(self, account_id: str | None = None) -> dict[str, Any]:
+        _ = account_id
+        holdings = MOCK_HOLDINGS
+        total_value = sum(item["value"] for item in holdings)
+        return {
+            "total_value": total_value,
+            "currency": "USD",
+            "holdings_count": len(holdings),
+            "holdings": holdings,
+        }
+
+    async def get_performance(self, query_range: str) -> dict[str, Any]:
+        return MOCK_PERFORMANCE[query_range]
+
+    async def get_transactions(self) -> list[dict[str, Any]]:
+        return MOCK_TRANSACTIONS
