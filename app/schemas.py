@@ -3,7 +3,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-DataSource = Literal["ghostfolio_api", "mock"]
+DATA_SOURCE_GHOSTFOLIO_API = "ghostfolio_api"
+DATA_SOURCE_MOCK = "mock"
+DataSource = Literal[DATA_SOURCE_GHOSTFOLIO_API, DATA_SOURCE_MOCK]
 
 
 class ToolError(BaseModel):
