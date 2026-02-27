@@ -1,0 +1,1 @@
+"""Ghostfolio agent application package."""
