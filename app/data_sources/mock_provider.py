@@ -1,4 +1,5 @@
 from typing import Any
+from datetime import datetime, timezone
 
 
 MOCK_HOLDINGS = [
@@ -77,7 +78,9 @@ class MockPortfolioDataProvider:
         }
 
     async def get_performance(self, query_range: str) -> dict[str, Any]:
-        return MOCK_PERFORMANCE[query_range]
+        payload = dict(MOCK_PERFORMANCE[query_range])
+        payload.setdefault("last_updated", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
+        return payload
 
     async def get_transactions(self) -> list[dict[str, Any]]:
         return MOCK_TRANSACTIONS
