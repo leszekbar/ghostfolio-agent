@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -9,7 +10,12 @@ DISCLAIMER = (
     "Disclaimer: This is not financial advice and is provided for informational purposes only."
 )
 
-ToolName = Literal["get_portfolio_summary", "get_performance", "get_transactions"]
+ToolName = Literal[
+    "get_portfolio_summary",
+    "get_performance",
+    "get_transactions",
+    "compare_holdings_performance",
+]
 
 
 class AgentState(TypedDict):
@@ -40,17 +46,21 @@ def _extract_range(query: str) -> str:
 
 def _route_tool(query: str, session_history: list[dict[str, str]]) -> tuple[ToolName, dict[str, Any]]:
     query_lower = query.lower()
+    # Follow-up prompts should prefer previous analytical context.
+    if any(phrase in query_lower for phrase in ["what about", "and for", "how about"]):
+        for item in reversed(session_history):
+            previous_tool = item.get("tool")
+            if previous_tool in {"get_performance", "compare_holdings_performance"}:
+                return "get_performance", {"query_range": _extract_range(query)}
+
+    if "compare" in query_lower and any(word in query_lower for word in ["holding", "holdings", "portfolio"]):
+        if any(word in query_lower for word in ["perform", "performance", "return", "gain"]):
+            return "compare_holdings_performance", {"query_range": _extract_range(query)}
+
     if any(word in query_lower for word in ["transaction", "buy", "sell", "activity"]):
         return "get_transactions", {"limit": 5}
     if any(word in query_lower for word in ["perform", "return", "ytd", "year", "gain"]):
         return "get_performance", {"query_range": _extract_range(query)}
-
-    # Handle lightweight follow-up prompts using session context.
-    if any(phrase in query_lower for phrase in ["what about", "and for", "how about"]):
-        for item in reversed(session_history):
-            previous_tool = item.get("tool")
-            if previous_tool == "get_performance":
-                return "get_performance", {"query_range": _extract_range(query)}
 
     return "get_portfolio_summary", {}
 
@@ -100,6 +110,27 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
         )
         return response, fact_grounded
 
+    if tool_name == "compare_holdings_performance":
+        summary = data.get("summary", {})
+        perf = data.get("performance", {})
+        total = float(summary["total_value"])
+        currency = str(summary["currency"])
+        count = int(summary["holdings_count"])
+        perf_range = str(perf["range"]).upper()
+        return_pct = float(perf["return_pct"])
+        gain = float(perf["absolute_gain"])
+        response = (
+            f"Compared to your total portfolio value of {_format_currency(total, currency)} "
+            f"across {count} holdings, your {perf_range} return is {return_pct:.2f}% "
+            f"({_format_currency(gain, currency)} absolute).\n\n{DISCLAIMER}"
+        )
+        fact_grounded = (
+            _format_currency(total, currency) in response
+            and f"{return_pct:.2f}%" in response
+            and _format_currency(gain, currency) in response
+        )
+        return response, fact_grounded
+
     txs = data.get("transactions", [])
     total_count = int(data.get("total_count", 0))
     if not txs:
@@ -116,6 +147,25 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
     return response, fact_grounded
 
 
+def _extract_last_updated(data: dict[str, Any]) -> str | None:
+    if "last_updated" in data and isinstance(data["last_updated"], str):
+        return data["last_updated"]
+    performance = data.get("performance")
+    if isinstance(performance, dict) and isinstance(performance.get("last_updated"), str):
+        return performance["last_updated"]
+    return None
+
+
+def _is_stale(last_updated: str | None) -> bool:
+    if not last_updated:
+        return False
+    try:
+        parsed = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
+        return datetime.now(timezone.utc) - parsed > timedelta(hours=6)
+    except ValueError:
+        return False
+
+
 def _build_graph():
     async def route_node(state: AgentState) -> dict[str, Any]:
         tool_name, tool_args = _route_tool(state["query"], state["session_history"])
@@ -128,6 +178,27 @@ def _build_graph():
             result = await get_portfolio_summary(context, account_id=state["tool_args"].get("account_id"))
         elif tool_name == "get_performance":
             result = await get_performance(context, query_range=state["tool_args"].get("query_range", "ytd"))
+        elif tool_name == "compare_holdings_performance":
+            summary = await get_portfolio_summary(context, account_id=state["tool_args"].get("account_id"))
+            performance = await get_performance(
+                context, query_range=state["tool_args"].get("query_range", "ytd")
+            )
+            if not summary.success:
+                result = summary
+            elif not performance.success:
+                result = performance
+            else:
+                result = ToolResult(
+                    success=True,
+                    data={
+                        "summary": summary.data,
+                        "performance": performance.data,
+                    },
+                )
+            return {
+                "tool_result": result,
+                "tool_calls": ["get_portfolio_summary", "get_performance"],
+            }
         else:
             result = await get_transactions(
                 context,
@@ -140,11 +211,26 @@ def _build_graph():
     async def verify_and_respond_node(state: AgentState) -> dict[str, Any]:
         response, fact_grounded = _synthesize_response(state)
         disclaimer_present = DISCLAIMER in response
-        confidence = 0.9 if state["tool_result"].success and fact_grounded else 0.4
+        data = state["tool_result"].data or {}
+        stale_data_warning = _is_stale(_extract_last_updated(data))
+        if state["tool_result"].success and fact_grounded and not stale_data_warning:
+            confidence = 0.9
+            confidence_level = "high"
+        elif state["tool_result"].success and fact_grounded:
+            confidence = 0.65
+            confidence_level = "medium"
+            response = (
+                f"{response}\n\nWarning: Market data appears older than 6 hours and may be stale."
+            )
+        else:
+            confidence = 0.4
+            confidence_level = "low"
         verification = {
             "fact_grounded": fact_grounded,
             "disclaimer_present": disclaimer_present,
             "no_trade_advice": True,
+            "stale_data_warning": stale_data_warning,
+            "confidence_level": confidence_level,
         }
         return {
             "response": response,
