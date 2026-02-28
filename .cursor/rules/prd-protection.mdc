@@ -1,0 +1,10 @@
+---
+description: Require explicit user permission before editing PRD
+globs: PRD.md
+alwaysApply: false
+---
+
+# PRD Protection
+
+- Never modify `PRD.md` unless the user explicitly grants permission in this conversation.
+- If a task would change `PRD.md`, pause and ask for explicit approval first.
