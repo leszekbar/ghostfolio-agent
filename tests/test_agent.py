@@ -1,7 +1,10 @@
 from fastapi.testclient import TestClient
 
+from app.data_sources.mock_provider import MockPortfolioDataProvider
 from app.data_sources.mock_provider import MOCK_PERFORMANCE
-from app.main import app
+from app.main import SESSION_TOKENS, app
+from app.ghostfolio_client import GhostfolioClient
+from app.schemas import DATA_SOURCE_GHOSTFOLIO_API
 
 
 client = TestClient(app)
@@ -149,3 +152,41 @@ def test_invalid_timestamp_triggers_stale_warning(monkeypatch):
     assert body["verification"]["stale_data_warning"] is True
     assert body["verification"]["confidence_level"] == "medium"
     assert "timestamp is missing, invalid, or older than 6 hours" in body["response"].lower()
+
+
+def test_chat_requires_session_token_when_server_uses_live_source(monkeypatch):
+    monkeypatch.setattr("app.main.settings.default_data_source", DATA_SOURCE_GHOSTFOLIO_API)
+    response = client.post(
+        "/chat",
+        json={"message": "What's my portfolio worth?", "session_id": "live-no-token"},
+    )
+    assert response.status_code == 401
+    assert "session is not connected" in response.json()["detail"].lower()
+
+
+def test_session_start_allows_live_chat_with_session_token(monkeypatch):
+    monkeypatch.setattr("app.main.settings.default_data_source", DATA_SOURCE_GHOSTFOLIO_API)
+    monkeypatch.setattr("app.main.build_provider", lambda data_source, api_provider: MockPortfolioDataProvider())
+
+    async def fake_exchange(self, token):
+        _ = token
+        return "jwt-token"
+
+    monkeypatch.setattr(GhostfolioClient, "exchange_access_token_for_auth_token", fake_exchange)
+
+    session_id = "live-with-token"
+    SESSION_TOKENS.pop(session_id, None)
+
+    start = client.post(
+        "/session/start",
+        json={"session_id": session_id, "access_token": "demo-security-token"},
+    )
+    assert start.status_code == 200
+    assert start.json()["connected"] is True
+
+    chat = client.post(
+        "/chat",
+        json={"message": "What's my portfolio worth?", "session_id": session_id},
+    )
+    assert chat.status_code == 200
+    assert chat.json()["tool_calls"] == ["get_portfolio_summary"]
