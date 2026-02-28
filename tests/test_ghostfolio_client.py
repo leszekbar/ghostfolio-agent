@@ -104,7 +104,7 @@ async def test_get_portfolio_holdings_calls_get_with_account_param(
 
     monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
     await client.get_portfolio_holdings(account_id="acc-123")
-    assert captured["url"] == "https://ghostfol.io/api/v2/portfolio/holdings"
+    assert captured["url"] == "https://ghostfol.io/api/v1/portfolio/holdings"
     assert captured["params"] == {"accountId": "acc-123"}
 
 
@@ -129,3 +129,31 @@ async def test_get_portfolio_performance_calls_get_with_range_param(
     await client.get_portfolio_performance(query_range="ytd")
     assert captured["url"] == "https://ghostfol.io/api/v2/portfolio/performance"
     assert captured["params"] == {"range": "ytd"}
+
+
+@pytest.mark.asyncio
+async def test_exchange_access_token_for_auth_token_calls_auth_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client = GhostfolioClient("https://ghostfol.io", token=None, timeout_seconds=10.0)
+    captured: dict[str, object] = {}
+
+    async def fake_post(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        json: dict[str, str] | None = None,
+    ):
+        captured["url"] = url
+        captured["json"] = json
+        return httpx.Response(
+            200,
+            json={"authToken": "jwt-token"},
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    auth_token = await client.exchange_access_token_for_auth_token("security-token")
+    assert auth_token == "jwt-token"
+    assert captured["url"] == "https://ghostfol.io/api/v1/auth/anonymous"
+    assert captured["json"] == {"accessToken": "security-token"}

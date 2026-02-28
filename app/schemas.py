@@ -22,7 +22,6 @@ class ToolResult(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
     session_id: str = "default"
-    data_source: DataSource | None = None
 
 
 class ChatResponse(BaseModel):
@@ -31,3 +30,16 @@ class ChatResponse(BaseModel):
     tool_calls: list[str]
     confidence: float
     verification: dict[str, Any]
+
+
+class SessionStartRequest(BaseModel):
+    session_id: str = "default"
+    access_token: str | None = None
+    # Backward compatibility for earlier UI naming.
+    ghostfolio_token: str | None = None
+
+
+class SessionStartResponse(BaseModel):
+    session_id: str
+    connected: bool
+    data_source: DataSource

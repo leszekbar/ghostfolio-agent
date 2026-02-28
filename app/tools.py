@@ -3,6 +3,10 @@ from typing import Any
 
 from app.data_sources.base import PortfolioDataProvider
 from app.schemas import ToolError, ToolResult
+from app.telemetry import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -15,14 +19,23 @@ def _safe_error(code: str, message: str) -> ToolResult:
 
 
 async def get_portfolio_summary(context: ToolContext, account_id: str | None = None) -> ToolResult:
+    logger.debug(
+        "tool_called",
+        extra={"tool": "get_portfolio_summary", "account_id": account_id},
+    )
     try:
         data = await context.provider.get_portfolio_summary(account_id=account_id)
         return ToolResult(success=True, data=data)
     except Exception as exc:
+        logger.warning("tool_failed", extra={"tool": "get_portfolio_summary", "error": str(exc)})
         return _safe_error("tool_execution_failed", str(exc))
 
 
 async def get_performance(context: ToolContext, query_range: str = "ytd") -> ToolResult:
+    logger.debug(
+        "tool_called",
+        extra={"tool": "get_performance", "query_range": query_range},
+    )
     valid_ranges = {"1d", "ytd", "1y", "5y", "max"}
     if query_range not in valid_ranges:
         return _safe_error("invalid_input", f"Unsupported range '{query_range}'")
@@ -31,6 +44,7 @@ async def get_performance(context: ToolContext, query_range: str = "ytd") -> Too
         data = await context.provider.get_performance(query_range=query_range)
         return ToolResult(success=True, data=data)
     except Exception as exc:
+        logger.warning("tool_failed", extra={"tool": "get_performance", "error": str(exc)})
         return _safe_error("tool_execution_failed", str(exc))
 
 
@@ -40,6 +54,15 @@ async def get_transactions(
     tx_type: str | None = None,
     limit: int = 5,
 ) -> ToolResult:
+    logger.debug(
+        "tool_called",
+        extra={
+            "tool": "get_transactions",
+            "symbol": symbol,
+            "tx_type": tx_type,
+            "limit": limit,
+        },
+    )
     try:
         transactions = await context.provider.get_transactions()
 
@@ -52,4 +75,5 @@ async def get_transactions(
 
         return ToolResult(success=True, data={"transactions": filtered, "total_count": len(filtered)})
     except Exception as exc:
+        logger.warning("tool_failed", extra={"tool": "get_transactions", "error": str(exc)})
         return _safe_error("tool_execution_failed", str(exc))

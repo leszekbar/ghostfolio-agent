@@ -58,7 +58,7 @@ async def test_portfolio_summary_raises_for_invalid_required_market_value():
             orders=[],
         )
     )
-    with pytest.raises(ValueError, match="invalid required numeric field 'marketValue'"):
+    with pytest.raises(ValueError, match="invalid required numeric field 'marketValue/valueInBaseCurrency'"):
         await provider.get_portfolio_summary()
 
 
@@ -86,6 +86,33 @@ async def test_portfolio_summary_sets_invalid_optional_numeric_fields_to_none():
 
 
 @pytest.mark.asyncio
+async def test_portfolio_summary_accepts_wrapped_holdings_response():
+    provider = GhostfolioAPIDataProvider(
+        FakeClient(
+            holdings={
+                "holdings": [
+                    {
+                        "symbol": "AAPL",
+                        "name": "Apple Inc.",
+                        "currency": "USD",
+                        "valueInBaseCurrency": 1234.5,
+                        "allocationInPercentage": 12.5,
+                        "netPerformancePercentage": 4.2,
+                    }
+                ]
+            },
+            performance={},
+            orders=[],
+        )
+    )
+    result = await provider.get_portfolio_summary()
+    assert result["holdings_count"] == 1
+    assert result["currency"] == "USD"
+    assert result["total_value"] == 1234.5
+    assert result["holdings"][0]["performance_pct"] == 4.2
+
+
+@pytest.mark.asyncio
 async def test_performance_raises_for_non_object_payload():
     provider = GhostfolioAPIDataProvider(FakeClient(holdings=[], performance=["bad"], orders=[]))
     with pytest.raises(ValueError, match="Expected performance object"):
@@ -106,9 +133,67 @@ async def test_performance_raises_for_invalid_required_numeric_fields():
 
 
 @pytest.mark.asyncio
+async def test_performance_accepts_nested_performance_shape():
+    provider = GhostfolioAPIDataProvider(
+        FakeClient(
+            holdings=[],
+            performance={
+                "performance": {
+                    "netPerformancePercentage": 9.8,
+                    "netPerformance": 4900.0,
+                }
+            },
+            orders=[],
+        )
+    )
+    result = await provider.get_performance("ytd")
+    assert result["return_pct"] == 9.8
+    assert result["absolute_gain"] == 4900.0
+
+
+@pytest.mark.asyncio
+async def test_performance_accepts_nested_alternative_gain_fields():
+    provider = GhostfolioAPIDataProvider(
+        FakeClient(
+            holdings=[],
+            performance={
+                "performance": {
+                    "netPerformancePercentageWithCurrencyEffect": 8.5,
+                    "netPerformanceWithCurrencyEffect": 4200.0,
+                }
+            },
+            orders=[],
+        )
+    )
+    result = await provider.get_performance("ytd")
+    assert result["return_pct"] == 8.5
+    assert result["absolute_gain"] == 4200.0
+
+
+@pytest.mark.asyncio
+async def test_performance_derives_absolute_gain_from_current_and_investment():
+    provider = GhostfolioAPIDataProvider(
+        FakeClient(
+            holdings=[],
+            performance={
+                "performance": {
+                    "netPerformancePercentage": 6.0,
+                    "currentValueInBaseCurrency": 10600.0,
+                    "totalInvestment": 10000.0,
+                }
+            },
+            orders=[],
+        )
+    )
+    result = await provider.get_performance("ytd")
+    assert result["return_pct"] == 6.0
+    assert result["absolute_gain"] == 600.0
+
+
+@pytest.mark.asyncio
 async def test_transactions_raises_for_non_list_payload():
     provider = GhostfolioAPIDataProvider(FakeClient(holdings=[], performance={}, orders={"bad": "shape"}))
-    with pytest.raises(ValueError, match="Expected transaction list"):
+    with pytest.raises(ValueError, match="Expected transaction list or \\{activities: \\[\\.\\.\\.\\]\\}"):
         await provider.get_transactions()
 
 
@@ -142,3 +227,30 @@ async def test_transactions_set_invalid_optional_numeric_fields_to_none():
     assert transactions[0]["quantity"] is None
     assert transactions[0]["unit_price"] is None
     assert transactions[0]["fee"] is None
+
+
+@pytest.mark.asyncio
+async def test_transactions_accept_wrapped_activities_response():
+    provider = GhostfolioAPIDataProvider(
+        FakeClient(
+            holdings=[],
+            performance={},
+            orders={
+                "activities": [
+                    {
+                        "date": "2026-02-20",
+                        "type": "BUY",
+                        "symbol": "AAPL",
+                        "quantity": 1,
+                        "unitPrice": 100,
+                        "fee": 0,
+                        "currency": "USD",
+                    }
+                ],
+                "count": 1,
+            },
+        )
+    )
+    transactions = await provider.get_transactions()
+    assert len(transactions) == 1
+    assert transactions[0]["symbol"] == "AAPL"
