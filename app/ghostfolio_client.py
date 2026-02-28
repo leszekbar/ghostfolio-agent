@@ -8,6 +8,7 @@ class GhostfolioClient:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout_seconds = timeout_seconds
+        self.max_network_retries = 1
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json"}
@@ -17,10 +18,24 @@ class GhostfolioClient:
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         url = f"{self.base_url}{path}"
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            response = await client.get(url, headers=self._headers(), params=params)
-        response.raise_for_status()
-        return response.json()
+        attempts = self.max_network_retries + 1
+        last_error: Exception | None = None
+
+        for attempt in range(attempts):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                    response = await client.get(url, headers=self._headers(), params=params)
+                response.raise_for_status()
+                return response.json()
+            except (httpx.RequestError, httpx.TimeoutException) as exc:
+                last_error = exc
+                if attempt == attempts - 1:
+                    raise
+
+        if last_error:
+            raise last_error
+
+        raise RuntimeError("Unexpected request failure without a captured exception")
 
     async def get_portfolio_holdings(self, account_id: str | None = None) -> Any:
         params: dict[str, Any] = {}
