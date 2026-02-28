@@ -129,3 +129,23 @@ def test_stale_data_warning_reduces_confidence(monkeypatch):
     assert body["verification"]["confidence_level"] == "medium"
     assert body["confidence"] < 0.8
     assert "older than 6 hours" in body["response"].lower()
+
+
+def test_invalid_timestamp_triggers_stale_warning(monkeypatch):
+    invalid_payload = dict(MOCK_PERFORMANCE["1y"])
+    invalid_payload["last_updated"] = "not-a-date"
+    monkeypatch.setitem(MOCK_PERFORMANCE, "1y", invalid_payload)
+
+    response = client.post(
+        "/chat",
+        json={
+            "message": "How has my portfolio performed over one year?",
+            "session_id": "s9",
+            "data_source": "mock",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["verification"]["stale_data_warning"] is True
+    assert body["verification"]["confidence_level"] == "medium"
+    assert "timestamp is missing, invalid, or older than 6 hours" in body["response"].lower()

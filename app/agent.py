@@ -156,14 +156,25 @@ def _extract_last_updated(data: dict[str, Any]) -> str | None:
     return None
 
 
-def _is_stale(last_updated: str | None) -> bool:
-    if not last_updated:
+def _needs_freshness_check(tool_name: ToolName) -> bool:
+    return tool_name in {"get_performance", "compare_holdings_performance"}
+
+
+def _freshness_warning(tool_name: ToolName, data: dict[str, Any]) -> bool:
+    if not _needs_freshness_check(tool_name):
         return False
+
+    last_updated = _extract_last_updated(data)
+    if not last_updated:
+        # Missing timestamps are treated as unknown freshness and should warn.
+        return True
+
     try:
         parsed = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
         return datetime.now(timezone.utc) - parsed > timedelta(hours=6)
     except ValueError:
-        return False
+        # Invalid timestamps are treated as unknown freshness and should warn.
+        return True
 
 
 def _build_graph():
@@ -212,7 +223,7 @@ def _build_graph():
         response, fact_grounded = _synthesize_response(state)
         disclaimer_present = DISCLAIMER in response
         data = state["tool_result"].data or {}
-        stale_data_warning = _is_stale(_extract_last_updated(data))
+        stale_data_warning = _freshness_warning(state["selected_tool"], data)
         if state["tool_result"].success and fact_grounded and not stale_data_warning:
             confidence = 0.9
             confidence_level = "high"
@@ -220,7 +231,7 @@ def _build_graph():
             confidence = 0.65
             confidence_level = "medium"
             response = (
-                f"{response}\n\nWarning: Market data appears older than 6 hours and may be stale."
+                f"{response}\n\nWarning: Market data timestamp is missing, invalid, or older than 6 hours and may be stale."
             )
         else:
             confidence = 0.4
