@@ -172,6 +172,11 @@ def _route_tool(query: str, session_history: list[dict[str, str]]) -> tuple[Tool
     if any(word in query_lower for word in ["perform", "return", "ytd", "year", "gain"]):
         return "get_performance", {"query_range": _extract_range(query)}
 
+    # Check if the user is asking about specific symbols in their portfolio
+    symbols = _extract_symbols(query)
+    if symbols:
+        return "get_portfolio_summary", {"filter_symbols": symbols}
+
     return "get_portfolio_summary", {}
 
 
@@ -242,6 +247,31 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
         currency = str(data["currency"])
         count = int(data["holdings_count"])
         holdings = data.get("holdings", [])
+        filter_symbols = state.get("tool_args", {}).get("filter_symbols", [])
+
+        if filter_symbols and holdings:
+            # User asked about specific symbols — search the full holdings list
+            lookup = {s.upper() for s in filter_symbols}
+            found = [h for h in holdings if h.get("symbol", "").upper() in lookup]
+            found_symbols = {h.get("symbol", "").upper() for h in found}
+            missing = [s for s in filter_symbols if s.upper() not in found_symbols]
+
+            lines = []
+            if found:
+                for h in found:
+                    alloc = h.get("allocation_pct")
+                    alloc_str = f", {alloc:.1f}% of portfolio" if alloc is not None else ""
+                    perf = h.get("performance_pct")
+                    perf_str = f", performance: {perf:+.2f}%" if perf is not None else ""
+                    lines.append(
+                        f"**{h.get('symbol', '?')}** ({h.get('name', '')}): "
+                        f"{_format_currency(h.get('value', 0), currency)}{alloc_str}{perf_str}"
+                    )
+            if missing:
+                lines.append(f"\nNot found in your portfolio: {', '.join(missing)}")
+
+            response = "\n".join(lines) + f"\n\n{DISCLAIMER}"
+            return response, bool(found)
 
         lines = [f"Your portfolio value is {_format_currency(total, currency)} across {count} holdings."]
         if holdings:
