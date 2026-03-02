@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -19,9 +19,7 @@ from app.tools import (
 
 logger = get_logger(__name__)
 
-DISCLAIMER = (
-    "Disclaimer: This is not financial advice and is provided for informational purposes only."
-)
+DISCLAIMER = "Disclaimer: This is not financial advice and is provided for informational purposes only."
 
 SYSTEM_PROMPT = """\
 You are a helpful portfolio assistant for Ghostfolio, a personal finance management tool.
@@ -106,19 +104,13 @@ class AgentState(TypedDict):
 
 def _is_trade_advice_query(query: str) -> bool:
     query_lower = query.lower()
-    for pattern in TRADE_ADVICE_PATTERNS:
-        if re.search(pattern, query_lower):
-            return True
-    return False
+    return any(re.search(pattern, query_lower) for pattern in TRADE_ADVICE_PATTERNS)
 
 
 def _is_prompt_injection(query: str) -> bool:
     """Check for prompt injection BEFORE sanitization (raw input)."""
     query_lower = query.lower()
-    for pattern in INJECTION_PATTERNS:
-        if re.search(pattern, query_lower):
-            return True
-    return False
+    return any(re.search(pattern, query_lower) for pattern in INJECTION_PATTERNS)
 
 
 def _sanitize_input(query: str) -> str:
@@ -150,9 +142,12 @@ def _route_tool(query: str, session_history: list[dict[str, str]]) -> tuple[Tool
             if previous_tool in {"get_performance", "compare_holdings_performance"}:
                 return "get_performance", {"query_range": _extract_range(query)}
 
-    if "compare" in query_lower and any(word in query_lower for word in ["holding", "holdings", "portfolio"]):
-        if any(word in query_lower for word in ["perform", "performance", "return", "gain"]):
-            return "compare_holdings_performance", {"query_range": _extract_range(query)}
+    if (
+        "compare" in query_lower
+        and any(word in query_lower for word in ["holding", "holdings", "portfolio"])
+        and any(word in query_lower for word in ["perform", "performance", "return", "gain"])
+    ):
+        return "compare_holdings_performance", {"query_range": _extract_range(query)}
 
     # P1 tool routing
     if any(word in query_lower for word in ["account", "brokerage", "cash balance", "platform"]):
@@ -181,7 +176,43 @@ def _extract_symbols(query: str) -> list[str]:
     # Match uppercase words that look like tickers (2-5 chars)
     tickers = re.findall(r"\b([A-Z]{2,5})\b", query)
     # Filter out common English words
-    stopwords = {"THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "CAN", "HER", "WAS", "ONE", "OUR", "OUT", "HOW", "HAS", "ITS", "GET", "WHO", "DID", "LET", "SAY", "SHE", "HIM", "HIS", "MAY", "NEW", "NOW", "OLD", "SEE", "WAY", "DAY", "TOO", "USE", "ETF"}
+    stopwords = {
+        "THE",
+        "AND",
+        "FOR",
+        "ARE",
+        "BUT",
+        "NOT",
+        "YOU",
+        "ALL",
+        "CAN",
+        "HER",
+        "WAS",
+        "ONE",
+        "OUR",
+        "OUT",
+        "HOW",
+        "HAS",
+        "ITS",
+        "GET",
+        "WHO",
+        "DID",
+        "LET",
+        "SAY",
+        "SHE",
+        "HIM",
+        "HIS",
+        "MAY",
+        "NEW",
+        "NOW",
+        "OLD",
+        "SEE",
+        "WAY",
+        "DAY",
+        "TOO",
+        "USE",
+        "ETF",
+    }
     return [t for t in tickers if t not in stopwords]
 
 
@@ -211,9 +242,7 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
             "I can also break down top allocations if you want.\n\n"
             f"{DISCLAIMER}"
         )
-        fact_grounded = (
-            f"{count} holdings" in response and _format_currency(total, currency) in response
-        )
+        fact_grounded = f"{count} holdings" in response and _format_currency(total, currency) in response
         return response, fact_grounded
 
     if tool_name == "get_performance":
@@ -223,11 +252,9 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
         currency = str(data["currency"])
         response = (
             f"Your {perf_range} portfolio return is {return_pct:.2f}% "
-            f"({ _format_currency(gain, currency) } absolute).\n\n{DISCLAIMER}"
+            f"({_format_currency(gain, currency)} absolute).\n\n{DISCLAIMER}"
         )
-        fact_grounded = (
-            f"{return_pct:.2f}%" in response and _format_currency(gain, currency) in response
-        )
+        fact_grounded = f"{return_pct:.2f}%" in response and _format_currency(gain, currency) in response
         return response, fact_grounded
 
     if tool_name == "compare_holdings_performance":
@@ -258,7 +285,9 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
         currency = data.get("currency", "USD")
         if not accounts:
             return f"No accounts found.\n\n{DISCLAIMER}", True
-        lines = [f"You have {count} account(s) with a total cash balance of {_format_currency(total_balance, currency)}:"]
+        lines = [
+            f"You have {count} account(s) with a total cash balance of {_format_currency(total_balance, currency)}:"
+        ]
         for acc in accounts:
             lines.append(
                 f"  - {acc['name']} ({acc.get('platform', 'Unknown')}): "
@@ -358,7 +387,7 @@ def _freshness_warning(tool_name: ToolName, data: dict[str, Any]) -> bool:
 
     try:
         parsed = datetime.fromisoformat(last_updated.replace("Z", "+00:00"))
-        return datetime.now(timezone.utc) - parsed > timedelta(hours=6)
+        return datetime.now(UTC) - parsed > timedelta(hours=6)
     except ValueError:
         # Invalid timestamps are treated as unknown freshness and should warn.
         return True
@@ -378,6 +407,7 @@ def _validate_output(response: str, data: dict[str, Any], tool_name: str) -> lis
 
 
 # ─── LLM-powered agent graph ───────────────────────────────────────────────
+
 
 def _build_llm_graph():
     """Build LLM-powered agent graph with tool calling loop."""
@@ -501,9 +531,7 @@ def _build_llm_graph():
 
         if tool_name == "compare_holdings_performance":
             summary = await get_portfolio_summary(context, account_id=tool_args.get("account_id"))
-            performance = await get_performance(
-                context, query_range=tool_args.get("query_range", "ytd")
-            )
+            performance = await get_performance(context, query_range=tool_args.get("query_range", "ytd"))
             if not summary.success:
                 result = summary
             elif not performance.success:
@@ -565,9 +593,7 @@ def _build_llm_graph():
         elif state["tool_result"].success and fact_grounded:
             confidence = 0.65
             confidence_level = "medium"
-            response = (
-                f"{response}\n\nWarning: Market data timestamp is missing, invalid, or older than 6 hours and may be stale."
-            )
+            response = f"{response}\n\nWarning: Market data timestamp is missing, invalid, or older than 6 hours and may be stale."
         else:
             confidence = 0.4
             confidence_level = "low"
@@ -610,6 +636,7 @@ def _build_llm_graph():
 
 
 # ─── Rule-based fallback graph (original) ──────────────────────────────────
+
 
 def _build_rule_graph():
     async def route_node(state: AgentState) -> dict[str, Any]:
@@ -664,9 +691,7 @@ def _build_rule_graph():
 
         if tool_name == "compare_holdings_performance":
             summary = await get_portfolio_summary(context, account_id=state["tool_args"].get("account_id"))
-            performance = await get_performance(
-                context, query_range=state["tool_args"].get("query_range", "ytd")
-            )
+            performance = await get_performance(context, query_range=state["tool_args"].get("query_range", "ytd"))
             if not summary.success:
                 result = summary
             elif not performance.success:
@@ -731,9 +756,7 @@ def _build_rule_graph():
         elif state["tool_result"].success and fact_grounded:
             confidence = 0.65
             confidence_level = "medium"
-            response = (
-                f"{response}\n\nWarning: Market data timestamp is missing, invalid, or older than 6 hours and may be stale."
-            )
+            response = f"{response}\n\nWarning: Market data timestamp is missing, invalid, or older than 6 hours and may be stale."
         else:
             confidence = 0.4
             confidence_level = "low"

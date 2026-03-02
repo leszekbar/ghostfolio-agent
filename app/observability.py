@@ -6,8 +6,9 @@ No-ops gracefully when Langfuse keys are not configured.
 from __future__ import annotations
 
 import time
-from contextlib import contextmanager
-from typing import Any, Generator
+from collections.abc import Generator
+from contextlib import contextmanager, suppress
+from typing import Any
 
 from app.config import settings
 from app.telemetry import get_logger
@@ -62,10 +63,8 @@ class TraceContext:
     def update(self, **kwargs: Any) -> None:
         if self._trace is None:
             return
-        try:
+        with suppress(Exception):
             self._trace.update(**kwargs)
-        except Exception:
-            pass
 
     def generation(self, name: str, **kwargs: Any) -> Any:
         if self._trace is None:
@@ -85,18 +84,14 @@ class SpanContext:
     def update(self, **kwargs: Any) -> None:
         if self._span is None:
             return
-        try:
+        with suppress(Exception):
             self._span.update(**kwargs)
-        except Exception:
-            pass
 
     def end(self) -> None:
         if self._span is None:
             return
-        try:
+        with suppress(Exception):
             self._span.end()
-        except Exception:
-            pass
 
 
 class _NoOpGeneration:
@@ -199,7 +194,5 @@ def flush() -> None:
     """Flush any pending Langfuse events."""
     client = _ensure_langfuse()
     if client is not None:
-        try:
+        with suppress(Exception):
             client.flush()
-        except Exception:
-            pass

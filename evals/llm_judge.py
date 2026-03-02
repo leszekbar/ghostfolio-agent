@@ -128,9 +128,9 @@ async def run_judge():
         values = [r["scores"].get(key, 0) for r in successful if key in r.get("scores", {})]
         avg_scores[key] = sum(values) / len(values) if values else 0
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("LLM JUDGE SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Evaluated: {len(successful)}/{len(results)} cases")
     for key, avg in avg_scores.items():
         print(f"  {key}: {avg:.2f}/5.00")

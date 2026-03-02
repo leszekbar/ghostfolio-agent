@@ -13,8 +13,8 @@ class GhostfolioAPIDataProvider:
             if value is None:
                 raise ValueError
             return float(value)
-        except (TypeError, ValueError):
-            raise ValueError(f"{context} has invalid required numeric field '{field_name}'")
+        except (TypeError, ValueError) as err:
+            raise ValueError(f"{context} has invalid required numeric field '{field_name}'") from err
 
     @staticmethod
     def _parse_optional_float(value: Any) -> float | None:
@@ -141,9 +141,7 @@ class GhostfolioAPIDataProvider:
         elif isinstance(response, dict) and isinstance(response.get("activities"), list):
             raw_transactions = response["activities"]
         else:
-            raise ValueError(
-                "Expected transaction list or {activities: [...]} from Ghostfolio API"
-            )
+            raise ValueError("Expected transaction list or {activities: [...]} from Ghostfolio API")
 
         transactions: list[dict[str, Any]] = []
         for index, item in enumerate(raw_transactions):
@@ -207,9 +205,7 @@ class GhostfolioAPIDataProvider:
                 result[symbol.upper()] = {
                     "symbol": symbol,
                     "name": item.get("name", symbol),
-                    "price": self._parse_optional_float(
-                        item.get("marketPrice", item.get("unitPrice"))
-                    ),
+                    "price": self._parse_optional_float(item.get("marketPrice", item.get("unitPrice"))),
                     "currency": item.get("currency", "USD"),
                     "change_pct": self._parse_optional_float(
                         item.get("marketChange", item.get("netPerformancePercentage"))

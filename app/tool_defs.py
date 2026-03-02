@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class GetPortfolioSummaryInput(BaseModel):
     """Input for retrieving portfolio summary."""
-    account_id: Optional[str] = Field(None, description="Optional account ID to filter by")
+
+    account_id: str | None = Field(None, description="Optional account ID to filter by")
 
 
 class GetPerformanceInput(BaseModel):
     """Input for retrieving portfolio performance."""
+
     query_range: str = Field(
         "ytd",
         description="Time range for performance data. Must be one of: '1d', 'ytd', '1y', '5y', 'max'",
@@ -22,28 +24,33 @@ class GetPerformanceInput(BaseModel):
 
 class GetTransactionsInput(BaseModel):
     """Input for retrieving transaction history."""
-    symbol: Optional[str] = Field(None, description="Optional stock symbol to filter by (e.g., 'AAPL')")
-    tx_type: Optional[str] = Field(None, description="Optional transaction type filter: 'BUY' or 'SELL'")
+
+    symbol: str | None = Field(None, description="Optional stock symbol to filter by (e.g., 'AAPL')")
+    tx_type: str | None = Field(None, description="Optional transaction type filter: 'BUY' or 'SELL'")
     limit: int = Field(5, description="Maximum number of transactions to return (default: 5)")
 
 
 class GetAccountDetailsInput(BaseModel):
     """Input for retrieving account details."""
-    account_id: Optional[str] = Field(None, description="Optional account ID for a specific account")
+
+    account_id: str | None = Field(None, description="Optional account ID for a specific account")
 
 
 class GetMarketDataInput(BaseModel):
     """Input for retrieving market data for symbols."""
+
     symbols: list[str] = Field(description="List of stock/ETF symbols to look up (e.g., ['AAPL', 'MSFT'])")
 
 
 class AnalyzeAllocationInput(BaseModel):
     """Input for portfolio allocation analysis. No parameters needed."""
+
     pass
 
 
 class CheckRiskRulesInput(BaseModel):
     """Input for portfolio risk assessment. No parameters needed."""
+
     pass
 
 
@@ -127,12 +134,14 @@ def build_openai_tools() -> list[dict[str, Any]]:
         # Remove $defs, title from top level for cleaner schemas
         schema.pop("$defs", None)
         schema.pop("title", None)
-        tools.append({
-            "type": "function",
-            "function": {
-                "name": tool_info["name"],
-                "description": tool_info["description"],
-                "parameters": schema,
-            },
-        })
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool_info["name"],
+                    "description": tool_info["description"],
+                    "parameters": schema,
+                },
+            }
+        )
     return tools

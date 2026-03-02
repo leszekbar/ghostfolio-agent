@@ -5,7 +5,6 @@ from app.data_sources.base import PortfolioDataProvider
 from app.schemas import ToolError, ToolResult
 from app.telemetry import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -201,22 +200,26 @@ async def check_risk_rules(context: ToolContext) -> ToolResult:
         for h in holdings:
             alloc = h.get("allocation_pct", 0) or 0
             if alloc > 30:
-                rules.append({
-                    "rule": "concentration",
-                    "severity": "warning" if alloc <= 50 else "critical",
-                    "message": f"{h['symbol']} represents {alloc:.1f}% of portfolio (threshold: 30%)",
-                    "symbol": h["symbol"],
-                    "value": alloc,
-                })
+                rules.append(
+                    {
+                        "rule": "concentration",
+                        "severity": "warning" if alloc <= 50 else "critical",
+                        "message": f"{h['symbol']} represents {alloc:.1f}% of portfolio (threshold: 30%)",
+                        "symbol": h["symbol"],
+                        "value": alloc,
+                    }
+                )
 
         # Rule 2: Low diversification (< 5 holdings)
         if len(holdings) < 5:
-            rules.append({
-                "rule": "diversification",
-                "severity": "warning",
-                "message": f"Portfolio has only {len(holdings)} holdings (recommended: 5+)",
-                "value": len(holdings),
-            })
+            rules.append(
+                {
+                    "rule": "diversification",
+                    "severity": "warning",
+                    "message": f"Portfolio has only {len(holdings)} holdings (recommended: 5+)",
+                    "value": len(holdings),
+                }
+            )
 
         # Rule 3: Single asset class > 80%
         asset_class_totals: dict[str, float] = {}
@@ -226,13 +229,15 @@ async def check_risk_rules(context: ToolContext) -> ToolResult:
             asset_class_totals[ac] = asset_class_totals.get(ac, 0) + alloc
         for ac, total in asset_class_totals.items():
             if total > 80:
-                rules.append({
-                    "rule": "asset_class_concentration",
-                    "severity": "warning",
-                    "message": f"{ac} represents {total:.1f}% of portfolio (threshold: 80%)",
-                    "asset_class": ac,
-                    "value": total,
-                })
+                rules.append(
+                    {
+                        "rule": "asset_class_concentration",
+                        "severity": "warning",
+                        "message": f"{ac} represents {total:.1f}% of portfolio (threshold: 80%)",
+                        "asset_class": ac,
+                        "value": total,
+                    }
+                )
 
         risk_level = "low"
         if any(r["severity"] == "critical" for r in rules):

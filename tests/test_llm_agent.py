@@ -7,11 +7,11 @@ from app.data_sources.mock_provider import MockPortfolioDataProvider
 from app.main import app
 from app.tools import ToolContext
 
-
 client = TestClient(app)
 
 
 # ─── Trade Advice Refusal ───────────────────────────────────────────────────
+
 
 def test_trade_advice_buy_refused():
     response = client.post(
@@ -67,6 +67,7 @@ def test_trade_advice_give_advice_refused():
 
 # ─── Prompt Injection Defense ───────────────────────────────────────────────
 
+
 def test_prompt_injection_ignore_instructions():
     response = client.post(
         "/chat",
@@ -109,6 +110,7 @@ def test_prompt_injection_act_as():
 
 
 # ─── P1 Tool Tests ──────────────────────────────────────────────────────────
+
 
 def test_account_details_happy_path():
     response = client.post(
@@ -156,6 +158,7 @@ def test_market_data_happy_path():
 
 
 # ─── Tool Unit Tests ────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_account_details_returns_accounts():

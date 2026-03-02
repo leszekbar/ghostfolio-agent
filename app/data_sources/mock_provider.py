@@ -1,6 +1,5 @@
+from datetime import UTC, datetime
 from typing import Any
-from datetime import datetime, timezone
-
 
 MOCK_HOLDINGS = [
     {
@@ -103,7 +102,13 @@ MOCK_ACCOUNTS = [
 MOCK_MARKET_DATA = {
     "AAPL": {"symbol": "AAPL", "name": "Apple Inc.", "price": 184.0, "currency": "USD", "change_pct": 1.2},
     "MSFT": {"symbol": "MSFT", "name": "Microsoft Corp.", "price": 405.0, "currency": "USD", "change_pct": -0.3},
-    "VTI": {"symbol": "VTI", "name": "Vanguard Total Stock Market ETF", "price": 280.0, "currency": "USD", "change_pct": 0.5},
+    "VTI": {
+        "symbol": "VTI",
+        "name": "Vanguard Total Stock Market ETF",
+        "price": 280.0,
+        "currency": "USD",
+        "change_pct": 0.5,
+    },
 }
 
 
@@ -121,7 +126,7 @@ class MockPortfolioDataProvider:
 
     async def get_performance(self, query_range: str) -> dict[str, Any]:
         payload = dict(MOCK_PERFORMANCE[query_range])
-        payload.setdefault("last_updated", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
+        payload.setdefault("last_updated", datetime.now(UTC).isoformat().replace("+00:00", "Z"))
         return payload
 
     async def get_transactions(self) -> list[dict[str, Any]]:

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-def get_llm() -> "BaseChatModel | None":
+def get_llm() -> BaseChatModel | None:
     """Return the best available chat model, or None when no API keys are set."""
     if not settings.llm_enabled:
         logger.info("llm_disabled", extra={"reason": "llm_enabled=False"})
@@ -49,7 +49,7 @@ def get_llm() -> "BaseChatModel | None":
     return None
 
 
-def get_eval_llm() -> "BaseChatModel | None":
+def get_eval_llm() -> BaseChatModel | None:
     """Return the evaluation/judge model (gpt-4.1-mini), or None."""
     if not settings.openai_api_key:
         return None

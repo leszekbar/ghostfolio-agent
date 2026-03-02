@@ -2,7 +2,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 DATA_SOURCE_GHOSTFOLIO_API = "ghostfolio_api"
 DATA_SOURCE_MOCK = "mock"
 DataSource = Literal[DATA_SOURCE_GHOSTFOLIO_API, DATA_SOURCE_MOCK]
