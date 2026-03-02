@@ -4,7 +4,6 @@ import httpx
 
 from app.telemetry import get_logger
 
-
 logger = get_logger(__name__)
 
 
@@ -87,6 +86,9 @@ class GhostfolioClient:
 
     async def get_orders(self) -> Any:
         return await self._get("/api/v1/order")
+
+    async def get_accounts(self) -> Any:
+        return await self._get("/api/v1/account")
 
     async def exchange_access_token_for_auth_token(self, access_token: str) -> str:
         logger.info("ghostfolio_auth_exchange_requested")

@@ -1,11 +1,9 @@
 from fastapi.testclient import TestClient
 
-from app.data_sources.mock_provider import MockPortfolioDataProvider
-from app.data_sources.mock_provider import MOCK_PERFORMANCE
-from app.main import SESSION_TOKENS, app
+from app.data_sources.mock_provider import MOCK_PERFORMANCE, MockPortfolioDataProvider
 from app.ghostfolio_client import GhostfolioClient
+from app.main import SESSION_TOKENS, app
 from app.schemas import DATA_SOURCE_GHOSTFOLIO_API
-
 
 client = TestClient(app)
 

@@ -59,7 +59,7 @@ async def session_start(request: SessionStartRequest) -> SessionStartResponse:
                 "session_start_auth_failed",
                 extra={"session_id": request.session_id, "error": str(exc)},
             )
-            raise HTTPException(status_code=401, detail=f"Failed to authenticate session: {exc}")
+            raise HTTPException(status_code=401, detail=f"Failed to authenticate session: {exc}") from exc
 
         SESSION_TOKENS[request.session_id] = auth_token
         logger.info("session_start_connected", extra={"session_id": request.session_id})

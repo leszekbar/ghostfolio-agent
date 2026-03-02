@@ -1,9 +1,8 @@
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 DEFAULT_REDACT_FIELDS = {
     "authorization",
@@ -31,10 +30,7 @@ def redact_sensitive_value(value: Any, field_name: str | None, redact_fields: se
         return BEARER_PATTERN.sub("Bearer [REDACTED]", value)
 
     if isinstance(value, dict):
-        return {
-            key: redact_sensitive_value(val, key, redact_fields)
-            for key, val in value.items()
-        }
+        return {key: redact_sensitive_value(val, key, redact_fields) for key, val in value.items()}
 
     if isinstance(value, list):
         return [redact_sensitive_value(item, None, redact_fields) for item in value]
@@ -50,14 +46,9 @@ class RedactionFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.msg = redact_sensitive_value(record.msg, None, self.redact_fields)
         if isinstance(record.args, tuple):
-            record.args = tuple(
-                redact_sensitive_value(arg, None, self.redact_fields) for arg in record.args
-            )
+            record.args = tuple(redact_sensitive_value(arg, None, self.redact_fields) for arg in record.args)
         elif isinstance(record.args, dict):
-            record.args = {
-                k: redact_sensitive_value(v, k, self.redact_fields)
-                for k, v in record.args.items()
-            }
+            record.args = {k: redact_sensitive_value(v, k, self.redact_fields) for k, v in record.args.items()}
 
         for key, value in list(record.__dict__.items()):
             if key.startswith("_"):
@@ -69,7 +60,7 @@ class RedactionFilter(logging.Filter):
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
