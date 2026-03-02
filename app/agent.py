@@ -493,7 +493,7 @@ def _build_llm_graph():
                 tool_args = first_call.get("args", {})
                 logger.info(
                     "llm_tool_selected",
-                    extra={"tool": tool_name, "args": tool_args, "llm_mode": True},
+                    extra={"tool": tool_name, "tool_args": tool_args, "llm_mode": True},
                 )
                 return {"selected_tool": tool_name, "tool_args": tool_args}
             else:

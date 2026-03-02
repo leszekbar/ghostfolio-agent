@@ -33,12 +33,13 @@ def _ensure_langfuse() -> Any:
     try:
         from langfuse import Langfuse
 
+        host = settings.langfuse_base_url or settings.langfuse_host
         _langfuse_client = Langfuse(
             public_key=settings.langfuse_public_key,
             secret_key=settings.langfuse_secret_key,
-            host=settings.langfuse_host,
+            host=host,
         )
-        logger.info("langfuse_initialized", extra={"host": settings.langfuse_host})
+        logger.info("langfuse_initialized", extra={"host": host})
         return _langfuse_client
     except Exception as exc:
         logger.warning("langfuse_init_failed", extra={"error": str(exc)})

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_base_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="GHOSTFOLIO_")
 

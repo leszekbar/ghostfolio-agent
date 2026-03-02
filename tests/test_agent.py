@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.data_sources.mock_provider import MOCK_PERFORMANCE, MockPortfolioDataProvider
@@ -6,6 +7,14 @@ from app.main import SESSION_TOKENS, app
 from app.schemas import DATA_SOURCE_GHOSTFOLIO_API
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _disable_llm(monkeypatch):
+    """Force rule-based routing so tests are deterministic."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "llm_enabled", False)
 
 
 def test_portfolio_summary_happy_path():
