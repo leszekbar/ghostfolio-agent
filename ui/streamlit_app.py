@@ -65,6 +65,19 @@ with st.sidebar:
         st.session_state.session_connected = False
         st.rerun()
 
+if not st.session_state.messages:
+    with st.chat_message("assistant"):
+        st.markdown(
+            "Welcome! I'm your Ghostfolio portfolio assistant. "
+            "I can help you explore your portfolio data. Try asking:\n\n"
+            '- **"What\'s my portfolio worth?"** — portfolio value and top holdings\n'
+            '- **"How has my portfolio performed this year?"** — YTD returns\n'
+            '- **"Show me my recent transactions"** — latest buy/sell activity\n'
+            '- **"Analyze my allocation"** — sector, region, and asset class breakdown\n'
+            '- **"Check my portfolio risk"** — concentration and diversification checks\n'
+            '- **"What are my account balances?"** — linked accounts overview\n'
+        )
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
