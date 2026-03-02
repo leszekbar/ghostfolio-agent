@@ -871,6 +871,7 @@ async def run_agent(
         output=output.get("response", ""),
         metadata={"mode": mode, "tool_calls": output.get("tool_calls", []), "duration_ms": timing["elapsed_ms"]},
     )
+    trace.end()
     flush()
 
     return output
