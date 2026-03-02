@@ -147,15 +147,18 @@ class GhostfolioAPIDataProvider:
         for index, item in enumerate(raw_transactions):
             if not isinstance(item, dict):
                 raise ValueError(f"Transaction at index {index} must be an object")
+            # Symbol is nested inside SymbolProfile in Ghostfolio API
+            symbol_profile = item.get("SymbolProfile") or {}
+            symbol = item.get("symbol") or symbol_profile.get("symbol")
             transactions.append(
                 {
                     "date": item.get("date"),
                     "type": item.get("type"),
-                    "symbol": item.get("symbol"),
+                    "symbol": symbol,
                     "quantity": self._parse_optional_float(item.get("quantity")),
                     "unit_price": self._parse_optional_float(item.get("unitPrice")),
                     "fee": self._parse_optional_float(item.get("fee")),
-                    "currency": item.get("currency", "USD"),
+                    "currency": item.get("currency") or symbol_profile.get("currency") or "USD",
                 }
             )
         return transactions
