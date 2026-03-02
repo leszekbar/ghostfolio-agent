@@ -1,5 +1,6 @@
 """Langfuse observability — traces agent runs, tool calls, and LLM interactions.
 
+Uses Langfuse v3 SDK (start_span / start_generation / update_current_trace).
 No-ops gracefully when Langfuse keys are not configured.
 """
 
@@ -47,33 +48,39 @@ def _ensure_langfuse() -> Any:
 
 
 class TraceContext:
-    """Wrapper around a Langfuse trace that no-ops when Langfuse is unavailable."""
+    """Wrapper around a Langfuse root span that no-ops when Langfuse is unavailable."""
 
-    def __init__(self, trace: Any = None):
-        self._trace = trace
+    def __init__(self, root_span: Any = None):
+        self._root = root_span
 
     def span(self, name: str, **kwargs: Any) -> SpanContext:
-        if self._trace is None:
+        if self._root is None:
             return SpanContext(None)
         try:
-            span = self._trace.span(name=name, **kwargs)
-            return SpanContext(span)
+            child = self._root.start_span(name=name, **kwargs)
+            return SpanContext(child)
         except Exception:
             return SpanContext(None)
 
     def update(self, **kwargs: Any) -> None:
-        if self._trace is None:
+        if self._root is None:
             return
         with suppress(Exception):
-            self._trace.update(**kwargs)
+            self._root.update(**kwargs)
 
     def generation(self, name: str, **kwargs: Any) -> Any:
-        if self._trace is None:
+        if self._root is None:
             return _NoOpGeneration()
         try:
-            return self._trace.generation(name=name, **kwargs)
+            return self._root.start_observation(name=name, as_type="generation", **kwargs)
         except Exception:
             return _NoOpGeneration()
+
+    def end(self) -> None:
+        if self._root is None:
+            return
+        with suppress(Exception):
+            self._root.end()
 
 
 class SpanContext:
@@ -109,19 +116,22 @@ def create_trace(
     user_id: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> TraceContext:
-    """Create a new Langfuse trace for an agent run."""
+    """Create a new Langfuse trace as a root span for an agent run."""
     client = _ensure_langfuse()
     if client is None:
         return TraceContext(None)
 
     try:
-        trace = client.trace(
-            name=name,
-            session_id=session_id,
-            user_id=user_id,
-            metadata=metadata or {},
-        )
-        return TraceContext(trace)
+        root = client.start_span(name=name, input=metadata or {})
+        # Attach session/user to the trace via update_current_trace
+        with suppress(Exception):
+            client.update_current_trace(
+                name=name,
+                session_id=session_id,
+                user_id=user_id,
+                metadata=metadata or {},
+            )
+        return TraceContext(root)
     except Exception as exc:
         logger.warning("langfuse_trace_failed", extra={"error": str(exc)})
         return TraceContext(None)
@@ -135,7 +145,7 @@ def log_tool_call(
     duration_ms: float,
     error: str | None = None,
 ) -> None:
-    """Log a tool call as a span on the trace."""
+    """Log a tool call as a child span on the trace."""
     span = trace.span(
         name=f"tool:{tool_name}",
         input=tool_args,
@@ -161,9 +171,10 @@ def log_llm_call(
         model=model,
         input=input_messages,
         output=output,
-        usage=usage,
         metadata={"duration_ms": duration_ms},
     )
+    if usage:
+        gen.update(usage_details=usage)
     gen.end()
 
 
