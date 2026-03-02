@@ -32,7 +32,7 @@ with st.sidebar:
     server_info = get_server_info()
     data_source = server_info.get("data_source", "unknown")
     st.caption(f"Data source: **{data_source}**")
-    st.caption(f"Ghostfolio: **{server_info.get('ghostfolio_url', 'unknown')}**")
+    st.caption(f"Ghostfolio Instance: **{server_info.get('ghostfolio_url', 'unknown')}**")
     st.caption(f"LLM: **{server_info.get('llm_model', 'unknown')}**")
     st.code(f"Session: {st.session_state.session_id}")
 
