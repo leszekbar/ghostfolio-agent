@@ -105,6 +105,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         query=request.message,
         session_history=session_history,
         tool_context=tool_context,
+        session_id=request.session_id,
     )
     logger.info(
         "chat_completed",
