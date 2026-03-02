@@ -8,7 +8,7 @@ AI-powered conversational portfolio assistant for [Ghostfolio](https://ghostfol.
 graph TD
     A[Streamlit Chat UI] -->|HTTP| B[FastAPI Server]
     B --> C{Agent}
-    C -->|Primary| D[LLM Mode<br/>OpenAI / Anthropic]
+    C -->|Primary| D[LLM Mode<br/>OpenRouter / OpenAI / Anthropic]
     C -->|Fallback| E[Rule-Based Mode]
     D --> F[Tool Layer<br/>7 Tools]
     E --> F
@@ -24,7 +24,7 @@ graph TD
 ## Features
 
 - **7 portfolio tools**: Summary, performance, transactions, accounts, market data, allocation analysis, risk rules
-- **LLM integration**: OpenAI GPT-4.1 (primary) with Anthropic Claude fallback
+- **LLM integration**: Configurable model via OpenRouter (GPT, Claude) with direct OpenAI/Anthropic fallback
 - **Verification layer**: Fact grounding, financial disclaimer, trade advice refusal, prompt injection defense
 - **Observability**: Langfuse tracing for tool calls, LLM invocations, and verification
 - **50+ eval test cases**: Deterministic checks + LLM-as-judge scoring
@@ -65,14 +65,40 @@ Environment variables (prefix: `GHOSTFOLIO_`):
 | `GHOSTFOLIO_BASE_URL` | `https://ghostfol.io` | Ghostfolio instance URL |
 | `GHOSTFOLIO_REQUEST_TIMEOUT_SECONDS` | `10` | HTTP timeout |
 
-### LLM
+### LLM (OpenRouter — recommended)
+
+The easiest way to configure the agent's LLM is via [OpenRouter](https://openrouter.ai), which provides a unified API for multiple providers. Set two env vars:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GHOSTFOLIO_OPENROUTER_API_KEY` | — | OpenRouter API key |
+| `GHOSTFOLIO_AGENT_MODEL` | — | Model to use (see table below) |
+
+Available models:
+
+| `AGENT_MODEL` value | Routed to |
+|---------------------|-----------|
+| `gpt-o` | `openai/o4-mini` |
+| `gpt-mini` | `openai/gpt-4.1-mini` |
+| `claude-haiku` | `anthropic/claude-haiku-4-5-20251001` |
+| `claude-sonnet` | `anthropic/claude-sonnet-4-20250514` |
+| `claude-opus` | `anthropic/claude-opus-4-20250514` |
+
+You can also pass a raw OpenRouter model ID (e.g. `openai/gpt-4.1`).
+
+### LLM (direct API keys — fallback)
+
+If OpenRouter is not configured, the agent falls back to direct provider keys:
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GHOSTFOLIO_OPENAI_API_KEY` | — | OpenAI API key |
 | `GHOSTFOLIO_OPENAI_MODEL` | `gpt-4.1` | OpenAI model |
-| `GHOSTFOLIO_ANTHROPIC_API_KEY` | — | Anthropic API key (fallback) |
+| `GHOSTFOLIO_ANTHROPIC_API_KEY` | — | Anthropic API key |
 | `GHOSTFOLIO_ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Anthropic model |
 | `GHOSTFOLIO_LLM_ENABLED` | `true` | Enable/disable LLM mode |
+
+**Priority**: OpenRouter > direct OpenAI > direct Anthropic > rule-based fallback.
 
 ### Observability
 | Variable | Default | Description |
@@ -126,7 +152,8 @@ Categories: happy path (21), edge cases (10), adversarial (12), multi-step (10)
 1. Create a Railway project from this repo
 2. Set environment variables:
    - `GHOSTFOLIO_DEFAULT_DATA_SOURCE=mock` (or `ghostfolio_api`)
-   - `GHOSTFOLIO_OPENAI_API_KEY=sk-...` (optional, for LLM mode)
+   - `GHOSTFOLIO_OPENROUTER_API_KEY=sk-or-...` and `GHOSTFOLIO_AGENT_MODEL=claude-sonnet` (recommended)
+   - Or `GHOSTFOLIO_OPENAI_API_KEY=sk-...` (direct OpenAI, alternative)
    - `GHOSTFOLIO_LANGFUSE_PUBLIC_KEY` / `GHOSTFOLIO_LANGFUSE_SECRET_KEY` (optional)
 3. Deploy — Railway uses `Procfile`: `web: bash scripts/start.sh`
 4. The Streamlit UI is the public entrypoint on `$PORT`
@@ -139,7 +166,7 @@ ghostfolio-agent/
 │   ├── agent.py           # Dual-mode LLM + rule-based agent
 │   ├── config.py          # Environment-based settings
 │   ├── ghostfolio_client.py # HTTP client with retry
-│   ├── llm.py             # LLM factory (OpenAI/Anthropic)
+│   ├── llm.py             # LLM factory (OpenRouter/OpenAI/Anthropic)
 │   ├── main.py            # FastAPI server
 │   ├── observability.py   # Langfuse tracing
 │   ├── schemas.py         # Pydantic models
