@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-4-20250514"
     llm_enabled: bool = True
 
+    # OpenRouter — unified LLM gateway (takes priority when configured)
+    openrouter_api_key: str = ""
+    agent_model: str = ""  # e.g. gpt-o, gpt-mini, claude-haiku, claude-sonnet, claude-opus
+
     # Langfuse observability
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""

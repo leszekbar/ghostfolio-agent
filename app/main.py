@@ -7,6 +7,7 @@ from app.config import settings
 from app.data_sources import build_provider
 from app.data_sources.ghostfolio_api_provider import GhostfolioAPIDataProvider
 from app.ghostfolio_client import GhostfolioClient
+from app.llm import get_active_model_name
 from app.schemas import (
     DATA_SOURCE_GHOSTFOLIO_API,
     ChatRequest,
@@ -36,18 +37,11 @@ SESSION_TOKENS: dict[str, str] = {}
 async def health() -> dict[str, str]:
     logger.debug("health_check", extra={"data_source": settings.default_data_source})
 
-    if settings.llm_enabled and settings.openai_api_key:
-        llm_model = settings.openai_model
-    elif settings.llm_enabled and settings.anthropic_api_key:
-        llm_model = settings.anthropic_model
-    else:
-        llm_model = "rule-based (no LLM)"
-
     return {
         "status": "ok",
         "data_source": settings.default_data_source,
         "ghostfolio_url": settings.ghostfolio_base_url,
-        "llm_model": llm_model,
+        "llm_model": get_active_model_name(),
     }
 
 
