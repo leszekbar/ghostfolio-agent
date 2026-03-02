@@ -4,17 +4,16 @@ import uuid
 import httpx
 import streamlit as st
 
-
 BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
 
 
-def get_server_data_source() -> str:
+def get_server_info() -> dict[str, str]:
     try:
         response = httpx.get(f"{BACKEND_URL}/health", timeout=2.0)
         response.raise_for_status()
-        return response.json().get("data_source", "mock")
+        return response.json()
     except Exception:
-        return "unknown"
+        return {"data_source": "unknown", "ghostfolio_url": "unknown", "llm_model": "unknown"}
 
 
 st.set_page_config(page_title="Ghostfolio AI Agent", page_icon=":chart_with_upwards_trend:")
@@ -30,8 +29,11 @@ if "session_connected" not in st.session_state:
 
 with st.sidebar:
     st.subheader("Settings")
-    data_source = get_server_data_source()
-    st.caption(f"Server data source: {data_source}")
+    server_info = get_server_info()
+    data_source = server_info.get("data_source", "unknown")
+    st.caption(f"Data source: **{data_source}**")
+    st.caption(f"Ghostfolio: **{server_info.get('ghostfolio_url', 'unknown')}**")
+    st.caption(f"LLM: **{server_info.get('llm_model', 'unknown')}**")
     st.code(f"Session: {st.session_state.session_id}")
 
     if data_source == "ghostfolio_api":
@@ -84,23 +86,20 @@ if prompt:
         "session_id": st.session_state.session_id,
     }
 
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            try:
-                response = httpx.post(f"{BACKEND_URL}/chat", json=payload, timeout=20.0)
-                response.raise_for_status()
-                body = response.json()
-                answer = body["response"]
-                meta = (
-                    f"Tools: {', '.join(body.get('tool_calls', [])) or 'none'} | "
-                    f"Confidence: {body.get('confidence', 0.0):.2f}"
-                )
-                st.markdown(answer)
-                st.caption(meta)
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": answer, "meta": meta}
-                )
-            except Exception as exc:
-                error_msg = f"Request failed: {exc}"
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+    with st.chat_message("assistant"), st.spinner("Thinking..."):
+        try:
+            response = httpx.post(f"{BACKEND_URL}/chat", json=payload, timeout=20.0)
+            response.raise_for_status()
+            body = response.json()
+            answer = body["response"]
+            meta = (
+                f"Tools: {', '.join(body.get('tool_calls', [])) or 'none'} | "
+                f"Confidence: {body.get('confidence', 0.0):.2f}"
+            )
+            st.markdown(answer)
+            st.caption(meta)
+            st.session_state.messages.append({"role": "assistant", "content": answer, "meta": meta})
+        except Exception as exc:
+            error_msg = f"Request failed: {exc}"
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})

@@ -35,7 +35,20 @@ SESSION_TOKENS: dict[str, str] = {}
 @app.get("/health")
 async def health() -> dict[str, str]:
     logger.debug("health_check", extra={"data_source": settings.default_data_source})
-    return {"status": "ok", "data_source": settings.default_data_source}
+
+    if settings.llm_enabled and settings.openai_api_key:
+        llm_model = settings.openai_model
+    elif settings.llm_enabled and settings.anthropic_api_key:
+        llm_model = settings.anthropic_model
+    else:
+        llm_model = "rule-based (no LLM)"
+
+    return {
+        "status": "ok",
+        "data_source": settings.default_data_source,
+        "ghostfolio_url": settings.ghostfolio_base_url,
+        "llm_model": llm_model,
+    }
 
 
 @app.post("/session/start", response_model=SessionStartResponse)
