@@ -7,6 +7,7 @@ from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
 
+from app.observability import create_trace, flush, log_llm_call, log_tool_call, log_verification, timed
 from app.schemas import ToolResult
 from app.telemetry import get_logger
 from app.tools import (
@@ -801,9 +802,12 @@ async def run_agent(
     query: str,
     session_history: list[dict[str, str]],
     tool_context: ToolContext,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Run the agent — tries LLM mode first, falls back to rule-based on error."""
     from app.config import settings
+
+    trace = create_trace(name="agent_run", session_id=session_id, metadata={"query": query})
 
     initial_state = {
         "query": query,
@@ -811,11 +815,16 @@ async def run_agent(
         "tool_context": tool_context,
     }
 
+    mode = "rule_based"
+    output: dict[str, Any] | None = None
+
     if settings.llm_enabled and (settings.openai_api_key or settings.anthropic_api_key):
         try:
-            logger.info("agent_mode", extra={"mode": "llm"})
-            result = await _LLM_GRAPH.ainvoke(initial_state)
-            return {
+            mode = "llm"
+            logger.info("agent_mode", extra={"mode": mode})
+            with timed() as timing:
+                result = await _LLM_GRAPH.ainvoke(initial_state)
+            output = {
                 "response": result["response"],
                 "tool_calls": result.get("tool_calls", []),
                 "verification": result.get("verification", {}),
@@ -825,13 +834,43 @@ async def run_agent(
         except Exception as exc:
             logger.warning("llm_agent_failed_falling_back", extra={"error": str(exc)})
 
-    # Rule-based fallback
-    logger.info("agent_mode", extra={"mode": "rule_based"})
-    result = await _RULE_GRAPH.ainvoke(initial_state)
-    return {
-        "response": result["response"],
-        "tool_calls": result.get("tool_calls", []),
-        "verification": result.get("verification", {}),
-        "confidence": result.get("confidence", 0.5),
-        "selected_tool": result.get("selected_tool", "get_portfolio_summary"),
-    }
+    if output is None:
+        mode = "rule_based"
+        logger.info("agent_mode", extra={"mode": mode})
+        with timed() as timing:
+            result = await _RULE_GRAPH.ainvoke(initial_state)
+        output = {
+            "response": result["response"],
+            "tool_calls": result.get("tool_calls", []),
+            "verification": result.get("verification", {}),
+            "confidence": result.get("confidence", 0.5),
+            "selected_tool": result.get("selected_tool", "get_portfolio_summary"),
+        }
+
+    # Log observability events
+    for tool_name in output.get("tool_calls", []):
+        log_tool_call(
+            trace,
+            tool_name=tool_name,
+            tool_args={},
+            result_success=output.get("verification", {}).get("fact_grounded", False),
+            duration_ms=timing["elapsed_ms"],
+        )
+
+    if mode == "llm":
+        log_llm_call(
+            trace,
+            model=settings.openai_model if settings.openai_api_key else settings.anthropic_model,
+            input_messages=[{"role": "user", "content": query}],
+            output=output.get("response", ""),
+            duration_ms=timing["elapsed_ms"],
+        )
+
+    log_verification(trace, output.get("verification", {}), output.get("confidence", 0.5))
+    trace.update(
+        output=output.get("response", ""),
+        metadata={"mode": mode, "tool_calls": output.get("tool_calls", []), "duration_ms": timing["elapsed_ms"]},
+    )
+    flush()
+
+    return output
