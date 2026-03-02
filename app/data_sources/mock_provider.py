@@ -9,6 +9,9 @@ MOCK_HOLDINGS = [
         "allocation_pct": 42.5,
         "value": 21250.0,
         "performance_pct": 12.4,
+        "sector": "Technology",
+        "region": "North America",
+        "asset_class": "Equity",
     },
     {
         "symbol": "MSFT",
@@ -16,6 +19,9 @@ MOCK_HOLDINGS = [
         "allocation_pct": 32.5,
         "value": 16250.0,
         "performance_pct": 8.2,
+        "sector": "Technology",
+        "region": "North America",
+        "asset_class": "Equity",
     },
     {
         "symbol": "VTI",
@@ -23,6 +29,9 @@ MOCK_HOLDINGS = [
         "allocation_pct": 25.0,
         "value": 12500.0,
         "performance_pct": 6.1,
+        "sector": "Diversified",
+        "region": "North America",
+        "asset_class": "ETF",
     },
 ]
 
@@ -64,6 +73,39 @@ MOCK_TRANSACTIONS = [
     },
 ]
 
+MOCK_ACCOUNTS = [
+    {
+        "id": "acc-1",
+        "name": "Main Brokerage",
+        "balance": 5420.50,
+        "currency": "USD",
+        "platform": "Interactive Brokers",
+        "is_excluded": False,
+    },
+    {
+        "id": "acc-2",
+        "name": "Retirement 401k",
+        "balance": 32150.00,
+        "currency": "USD",
+        "platform": "Fidelity",
+        "is_excluded": False,
+    },
+    {
+        "id": "acc-3",
+        "name": "Savings",
+        "balance": 12429.50,
+        "currency": "USD",
+        "platform": "Vanguard",
+        "is_excluded": False,
+    },
+]
+
+MOCK_MARKET_DATA = {
+    "AAPL": {"symbol": "AAPL", "name": "Apple Inc.", "price": 184.0, "currency": "USD", "change_pct": 1.2},
+    "MSFT": {"symbol": "MSFT", "name": "Microsoft Corp.", "price": 405.0, "currency": "USD", "change_pct": -0.3},
+    "VTI": {"symbol": "VTI", "name": "Vanguard Total Stock Market ETF", "price": 280.0, "currency": "USD", "change_pct": 0.5},
+}
+
 
 class MockPortfolioDataProvider:
     async def get_portfolio_summary(self, account_id: str | None = None) -> dict[str, Any]:
@@ -84,3 +126,14 @@ class MockPortfolioDataProvider:
 
     async def get_transactions(self) -> list[dict[str, Any]]:
         return MOCK_TRANSACTIONS
+
+    async def get_accounts(self) -> list[dict[str, Any]]:
+        return MOCK_ACCOUNTS
+
+    async def get_market_data(self, symbols: list[str]) -> dict[str, Any]:
+        result = {}
+        for symbol in symbols:
+            upper = symbol.upper()
+            if upper in MOCK_MARKET_DATA:
+                result[upper] = MOCK_MARKET_DATA[upper]
+        return result

@@ -10,3 +10,9 @@ class PortfolioDataProvider(Protocol):
 
     async def get_transactions(self) -> list[dict[str, Any]]:
         ...
+
+    async def get_accounts(self) -> list[dict[str, Any]]:
+        ...
+
+    async def get_market_data(self, symbols: list[str]) -> dict[str, Any]:
+        ...

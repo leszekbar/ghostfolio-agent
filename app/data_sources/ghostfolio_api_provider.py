@@ -63,6 +63,9 @@ class GhostfolioAPIDataProvider:
                     "performance_pct": self._parse_optional_float(
                         item.get("performanceInPercentage", item.get("netPerformancePercentage"))
                     ),
+                    "sector": item.get("sector"),
+                    "region": item.get("region"),
+                    "asset_class": item.get("assetClass", item.get("assetSubClass")),
                 }
             )
 
@@ -158,3 +161,58 @@ class GhostfolioAPIDataProvider:
                 }
             )
         return transactions
+
+    async def get_accounts(self) -> list[dict[str, Any]]:
+        response = await self.client.get_accounts()
+        if isinstance(response, list):
+            raw_accounts = response
+        elif isinstance(response, dict) and isinstance(response.get("accounts"), list):
+            raw_accounts = response["accounts"]
+        else:
+            raise ValueError("Expected accounts list or {accounts: [...]} from Ghostfolio API")
+
+        accounts: list[dict[str, Any]] = []
+        for index, item in enumerate(raw_accounts):
+            if not isinstance(item, dict):
+                raise ValueError(f"Account at index {index} must be an object")
+            accounts.append(
+                {
+                    "id": item.get("id", f"account-{index}"),
+                    "name": item.get("name", "Unknown"),
+                    "balance": self._parse_optional_float(item.get("balance")) or 0.0,
+                    "currency": item.get("currency", "USD"),
+                    "platform": item.get("platformId") or item.get("platform", "Unknown"),
+                    "is_excluded": bool(item.get("isExcluded", False)),
+                }
+            )
+        return accounts
+
+    async def get_market_data(self, symbols: list[str]) -> dict[str, Any]:
+        # Derive market data from holdings (Ghostfolio doesn't have a standalone quote endpoint)
+        response = await self.client.get_portfolio_holdings()
+        if isinstance(response, list):
+            raw_holdings = response
+        elif isinstance(response, dict) and isinstance(response.get("holdings"), list):
+            raw_holdings = response["holdings"]
+        else:
+            return {}
+
+        lookup = {s.upper() for s in symbols}
+        result: dict[str, Any] = {}
+        for item in raw_holdings:
+            if not isinstance(item, dict):
+                continue
+            symbol = item.get("symbol", "")
+            if symbol.upper() in lookup:
+                result[symbol.upper()] = {
+                    "symbol": symbol,
+                    "name": item.get("name", symbol),
+                    "price": self._parse_optional_float(
+                        item.get("marketPrice", item.get("unitPrice"))
+                    ),
+                    "currency": item.get("currency", "USD"),
+                    "change_pct": self._parse_optional_float(
+                        item.get("marketChange", item.get("netPerformancePercentage"))
+                    ),
+                }
+        return result
