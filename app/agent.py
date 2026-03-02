@@ -159,7 +159,10 @@ def _route_tool(query: str, session_history: list[dict[str, str]]) -> tuple[Tool
         if symbols:
             return "get_market_data", {"symbols": symbols}
         return "get_market_data", {"symbols": ["AAPL"]}
-    if any(word in query_lower for word in ["allocation", "diversif", "sector", "region", "breakdown", "exposure"]):
+    if any(
+        word in query_lower
+        for word in ["allocation", "diversif", "sector", "region", "breakdown", "break down", "exposure"]
+    ):
         return "analyze_allocation", {}
     if any(word in query_lower for word in ["risk", "health check", "balanced", "concentration"]):
         return "check_risk_rules", {}
@@ -238,11 +241,20 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
         total = float(data["total_value"])
         currency = str(data["currency"])
         count = int(data["holdings_count"])
-        response = (
-            f"Your portfolio value is {_format_currency(total, currency)} across {count} holdings. "
-            "I can also break down top allocations if you want.\n\n"
-            f"{DISCLAIMER}"
-        )
+        holdings = data.get("holdings", [])
+
+        lines = [f"Your portfolio value is {_format_currency(total, currency)} across {count} holdings."]
+        if holdings:
+            lines.append("\nTop holdings:")
+            for h in sorted(holdings, key=lambda x: x.get("value", 0), reverse=True)[:10]:
+                alloc = h.get("allocation_pct")
+                alloc_str = f" ({alloc:.1f}%)" if alloc is not None else ""
+                lines.append(
+                    f"  - {h.get('symbol', '?')} ({h.get('name', '')}): "
+                    f"{_format_currency(h.get('value', 0), currency)}{alloc_str}"
+                )
+
+        response = "\n".join(lines) + f"\n\n{DISCLAIMER}"
         fact_grounded = f"{count} holdings" in response and _format_currency(total, currency) in response
         return response, fact_grounded
 
