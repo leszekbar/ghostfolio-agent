@@ -247,7 +247,10 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
         currency = str(data["currency"])
         count = int(data["holdings_count"])
         holdings = data.get("holdings", [])
-        filter_symbols = state.get("tool_args", {}).get("filter_symbols", [])
+        # Check both tool_args (rule-based) and original query (LLM mode) for symbols
+        filter_symbols = state.get("tool_args", {}).get("filter_symbols", []) or _extract_symbols(
+            state.get("query", "")
+        )
 
         if filter_symbols and holdings:
             # User asked about specific symbols — search the full holdings list
