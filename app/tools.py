@@ -70,6 +70,8 @@ async def get_transactions(
             filtered = [item for item in filtered if item.get("symbol", "").upper() == symbol.upper()]
         if tx_type:
             filtered = [item for item in filtered if item.get("type", "").upper() == tx_type.upper()]
+        # Sort newest-first so the most recent transactions appear at the top
+        filtered.sort(key=lambda t: t.get("date", ""), reverse=True)
         filtered = filtered[: max(limit, 1)]
 
         return ToolResult(success=True, data={"transactions": filtered, "total_count": len(filtered)})

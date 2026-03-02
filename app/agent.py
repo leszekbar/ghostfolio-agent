@@ -351,13 +351,15 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
             response = f"I did not find matching recent transactions.\n\n{DISCLAIMER}"
             return response, True
 
-        first = txs[0]
-        snippet = (
-            f"Most recent transaction: {first.get('type')} {first.get('quantity')} "
-            f"{first.get('symbol')} at {first.get('currency')} {first.get('unit_price')} on {first.get('date')}."
-        )
-        response = f"I found {total_count} recent transactions. {snippet}\n\n{DISCLAIMER}"
-        fact_grounded = f"I found {total_count} recent transactions." in response
+        lines = [f"Here are your {total_count} most recent transactions:"]
+        for tx in txs:
+            lines.append(
+                f"  - {tx.get('date')}: {tx.get('type')} {tx.get('quantity')} "
+                f"{tx.get('symbol')} at {tx.get('currency')} {tx.get('unit_price')}"
+                f" (fee: {tx.get('fee', 0)})"
+            )
+        response = "\n".join(lines) + f"\n\n{DISCLAIMER}"
+        fact_grounded = f"{total_count} most recent transactions" in response
         return response, fact_grounded
 
     # Fallback
