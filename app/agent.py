@@ -263,7 +263,7 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
             if found:
                 for h in found:
                     alloc = h.get("allocation_pct")
-                    alloc_str = f", {alloc:.1f}% of portfolio" if alloc is not None else ""
+                    alloc_str = f", {alloc:.2f}% of portfolio" if alloc is not None else ""
                     perf = h.get("performance_pct")
                     perf_str = f", performance: {perf:+.2f}%" if perf is not None else ""
                     lines.append(
@@ -281,7 +281,7 @@ def _synthesize_response(state: AgentState) -> tuple[str, bool]:
             lines.append("\nTop holdings:")
             for h in sorted(holdings, key=lambda x: x.get("value", 0), reverse=True)[:10]:
                 alloc = h.get("allocation_pct")
-                alloc_str = f" ({alloc:.1f}%)" if alloc is not None else ""
+                alloc_str = f" ({alloc:.2f}%)" if alloc is not None else ""
                 lines.append(
                     f"  - {h.get('symbol', '?')} ({h.get('name', '')}): "
                     f"{_format_currency(h.get('value', 0), currency)}{alloc_str}"
